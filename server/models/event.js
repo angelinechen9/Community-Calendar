@@ -7,6 +7,10 @@ const eventSchema = mongoose.Schema({
   description: {
     type: String,
     required: true
+  },
+  userId: {
+    type: String,
+    required: true
   }
 })
 const Event = mongoose.model("Event", eventSchema);

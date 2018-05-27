@@ -4,92 +4,36 @@ const path = require("path");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const methodOverride = require("method-override");
-const _ = require("lodash");
-const {Event} = require("./models/event.js");
+const exphbs = require("express-handlebars");
+const session = require("express-session");
+const flash = require("connect-flash");
+require("dotenv").config();
+const eventsRoute = require("./routes/eventsRoute.js");
+const authRoute = require("./routes/authRoute.js");
 const app = express();
 app.set("view engine", "hbs");
+app.engine("hbs", exphbs({defaultLayout: "main", extname: ".hbs"}));
 app.set("views", path.join(__dirname, "../views"));
 app.use(express.static(path.join(__dirname, "../public")));
 hbs.registerPartials(path.join(__dirname, "../views", "partials"));
-mongoose.connect("mongodb://localhost:27017/CommunityCalendar");
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/CommunityCalendar");
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(methodOverride("_method"));
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: {secure: false}
+}))
+app.use(flash());
+app.use((req, res, next) => {
+  res.locals.errorMessages = req.flash("errorMessages");
+  next();
+})
 app.get("/", (req, res) => {
-  res.redirect("/events");
+  res.render("home.hbs");
 })
-app.get("/events", (req, res) => {
-  Event.find()
-  .then(events => {
-    res.render("index.hbs", {
-      events
-    });
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.get("/events/new", (req, res) => {
-  res.render("new.hbs");
-})
-app.post("/events", (req, res) => {
-  const event = new Event({
-    title: req.body.title,
-    description: req.body.description
-  })
-  event.save()
-  .then(event => {
-    res.redirect("/events");
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.get("/events/:id", (req, res) => {
-  Event.find({_id: req.params.id})
-  .then(event => {
-    res.render("show.hbs", {
-      id: event[0]._id,
-      title: event[0].title,
-      description: event[0].description
-    });
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.get("/events/:id/edit", (req, res) => {
-  Event.find({_id: req.params.id})
-  .then(event => {
-    res.render("edit.hbs", {
-      id: event[0]._id,
-      title: event[0].title,
-      description: event[0].description
-    });
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.put("/events/:id", (req, res) => {
-  const id = req.params.id;
-  const body = _.pick(req.body, ["title", "description"]);
-  Event.findByIdAndUpdate(id, {$set: body}, {new: true})
-  .then(event => {
-    res.redirect("/events");
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.delete("/events/:id", (req, res) => {
-  const id = req.params.id;
-  Event.findByIdAndRemove(id)
-  .then(event => {
-    res.redirect("/events");
-  })
-  .catch(e => {
-    res.status(404).send(e);
-  })
-})
-app.listen(3000);
+app.use("/events", eventsRoute);
+app.use("/", authRoute);
+app.listen(process.env.PORT || 3000);
